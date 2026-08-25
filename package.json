@@ -33,5 +33,11 @@
         "vite": "^5.3.4",
         "vite-plugin-pwa": "^0.20.0",
         "vitest": "^2.0.2"
+    },
+    "scripts": {
+        "dev": "vite",
+        "build": "tsc && vite build",
+        "preview": "vite preview",
+        "deploy": "npm run build && gh-pages -d dist"
     }
 }
