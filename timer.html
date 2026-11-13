@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>مؤقت تنازلي</title>
+<style>
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  :root {
+    --bg: #000000;
+    --fg: #ffffff;
+    --accent: #00e5ff;
+    --accent-dim: #007a8a;
+    --danger: #ff2d55;
+    --muted: #555555;
+  }
+
+  html, body {
+    height: 100%;
+    overflow: hidden;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: "Segoe UI", Tahoma, "Helvetica Neue", Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 16px;
+    transition: background 0.15s ease, color 0.15s ease;
+    user-select: none;
+  }
+
+  /* ===== شاشة التنبيه ===== */
+  body.alarm {
+    animation: flash 0.5s steps(1) infinite;
+  }
+
+  @keyframes flash {
+    0%   { background: #ff0000; color: #ffffff; }
+    50%  { background: #ffffff; color: #000000; }
+    100% { background: #ff0000; color: #ffffff; }
+  }
+
+  body.alarm .ring-track { stroke: rgba(0,0,0,0.15); }
+  body.alarm .ring-progress { stroke: #000; }
+  body.alarm .timer-text { color: #000; }
+  body.alarm .alarm-badge { display: inline-block; }
+
+  /* ===== الحاوية الرئيسية ===== */
+  .stage {
+    position: relative;
+    width: min(78vw, 78vh, 440px);
+    aspect-ratio: 1 / 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  svg.ring {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    transform: rotate(-90deg);
+    overflow: visible;
+  }
+
+  .ring-track {
+    fill: none;
+    stroke: #1a1a1a;
+    stroke-width: 10;
+  }
+
+  .ring-progress {
+    fill: none;
+    stroke: var(--accent);
+    stroke-width: 10;
+    stroke-linecap: round;
+    filter: drop-shadow(0 0 8px rgba(0, 229, 255, 0.55));
+    transition: stroke-dashoffset 0.25s linear, stroke 0.3s ease;
+  }
+
+  .ring-progress.warn {
+    stroke: #ffb300;
+    filter: drop-shadow(0 0 8px rgba(255, 179, 0, 0.55));
+  }
+
+  .ring-progress.danger {
+    stroke: var(--danger);
+    filter: drop-shadow(0 0 10px rgba(255, 45, 85, 0.7));
+  }
+
+  /* ===== النص الداخلي ===== */
+  .inner {
+    position: relative;
+    z-index: 2;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 0 8px;
+  }
+
+  .timer-text {
+    font-size: clamp(2.6rem, 13vw, 4.6rem);
+    font-weight: 800;
+    letter-spacing: 2px;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    color: var(--fg);
+    text-shadow: 0 0 24px rgba(0, 229, 255, 0.25);
+    transition: color 0.2s ease;
+  }
+
+  .status {
+    font-size: clamp(0.7rem, 3vw, 0.85rem);
+    color: var(--muted);
+    letter-spacing: 1px;
+    min-height: 1.2em;
+  }
+
+  .alarm-badge {
+    display: none;
+    font-size: clamp(0.75rem, 3.2vw, 0.95rem);
+    font-weight: 700;
+    letter-spacing: 2px;
+    padding: 4px 14px;
+    border-radius: 999px;
+    background: #000;
+    color: #fff;
+  }
+
+  /* ===== لوحة الإدخال ===== */
+  .panel {
+    margin-top: 28px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    width: min(92vw, 460px);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+  }
+
+  .inputs {
+    display: flex;
+    align-items: flex-end;
+    gap: 14px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .field {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .field label {
+    font-size: 0.78rem;
+    color: #888;
+    letter-spacing: 1px;
+  }
+
+  .field input {
+    width: 92px;
+    padding: 12px 8px;
+    text-align: center;
+    font-size: 1.6rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--fg);
+    background: #0d0d0d;
+    border: 2px solid #222;
+    border-radius: 14px;
+    outline: none;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    -moz-appearance: textfield;
+  }
+
+  .field input::-webkit-outer-spin-button,
+  .field input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  .field input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(0, 229, 255, 0.15);
+  }
+
+  .field input.error {
+    border-color: var(--danger);
+    box-shadow: 0 0 0 3px rgba(255, 45, 85, 0.18);
+  }
+
+  .colon {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #444;
+    padding-bottom: 12px;
+  }
+
+  /* ===== الأزرار ===== */
+  .buttons {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    flex-wrap: wrap;
+    width: 100%;
+  }
+
+  button {
+    font-family: inherit;
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    padding: 13px 26px;
+    border-radius: 14px;
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: transform 0.12s ease, background 0.2s ease, border-color 0.2s ease, opacity 0.2s ease, color 0.2s ease;
+    min-width: 118px;
+    user-select: none;
+  }
+
+  button:active { transform: scale(0.96); }
+
+  button:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  .btn-start {
+    background: var(--accent);
+    color: #00262b;
+    box-shadow: 0 0 22px rgba(0, 229, 255, 0.35);
+  }
+  .btn-start:hover:not(:disabled) { background: #4df0ff; }
+
+  .btn-pause {
+    background: transparent;
+    color: var(--accent);
+    border-color: var(--accent-dim);
+  }
+  .btn-pause:hover:not(:disabled) {
+    border-color: var(--accent);
+    background: rgba(0, 229, 255, 0.08);
+  }
+
+  .btn-reset {
+    background: transparent;
+    color: #aaa;
+    border-color: #333;
+  }
+  .btn-reset:hover:not(:disabled) {
+    color: #fff;
+    border-color: #666;
+    background: rgba(255, 255, 255, 0.05);
+  }
+
+  .btn-stop-alarm {
+    display: none;
+    background: #000;
+    color: #fff;
+    border: 2px solid #000;
+    box-shadow: 0 0 24px rgba(0,0,0,0.5);
+    margin-top: 4px;
+  }
+  .btn-stop-alarm:hover { background: #222; color: #fff; }
+
+  body.alarm .btn-start,
+  body.alarm .btn-pause,
+  body.alarm .btn-reset,
+  body.alarm .inputs {
+    opacity: 0.25;
+    pointer-events: none;
+  }
+
+  body.alarm .btn-stop-alarm {
+    display: inline-block;
+    opacity: 1;
+  }
+
+  .hint {
+    font-size: 0.72rem;
+    color: #444;
+    text-align: center;
+    max-width: 340px;
+    line-height: 1.5;
+  }
+
+  /* ===== تجاوب ===== */
+  @media (max-width: 480px) {
+    .stage { width: min(86vw, 86vh, 360px); }
+    .field input { width: 78px; font-size: 1.35rem; padding: 10px 6px; }
+    .colon { font-size: 1.6rem; padding-bottom: 10px; }
+    button { padding: 12px 18px; min-width: 104px; font-size: 0.95rem; }
+    .panel { margin-top: 22px; gap: 14px; }
+  }
+
+  @media (max-height: 640px) {
+    .stage { width: min(62vw, 62vh, 320px); }
+    .panel { margin-top: 14px; gap: 10px; }
+    .timer-text { font-size: clamp(2.2rem, 10vw, 3.4rem); }
+  }
+</style>
+</head>
+<body>
+
+  <!-- الدائرة والمؤقت -->
+  <div class="stage">
+    <svg class="ring" viewBox="0 0 200 200" aria-hidden="true">
+      <circle class="ring-track" cx="100" cy="100" r="90"></circle>
+      <circle class="ring-progress" id="ringProgress" cx="100" cy="100" r="90"></circle>
+    </svg>
+
+    <div class="inner">
+      <div class="timer-text" id="timerText">00:00</div>
+      <div class="status" id="statusText">أدخل الوقت ثم اضغط «ابدأ»</div>
+      <div class="alarm-badge" id="alarmBadge">انتهى الوقت!</div>
+    </div>
+  </div>
+
+  <!-- لوحة التحكم -->
+  <div class="panel">
+    <div class="inputs" id="inputs">
+      <div class="field">
+        <label for="minutes">دقائق</label>
+        <input type="number" id="minutes" min="0" max="999" value="5" inputmode="numeric">
+      </div>
+      <div class="colon">:</div>
+      <div class="field">
+        <label for="seconds">ثوانٍ</label>
+        <input type="number" id="seconds" min="0" max="59" value="0" inputmode="numeric">
+      </div>
+    </div>
+
+    <div class="buttons">
+      <button class="btn-start" id="btnStart">ابدأ</button>
+      <button class="btn-pause" id="btnPause" disabled>إيقاف مؤقت</button>
+      <button class="btn-reset" id="btnReset">إعادة ضبط</button>
+      <button class="btn-stop-alarm" id="btnStopAlarm">إيقاف التنبيه</button>
+    </div>
+
+    <p class="hint">عند وصول المؤقت إلى الصفر يبدأ تنبيه لمدة 10 ثوانٍ مع صوت رنين.</p>
+  </div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ===== العناصر =====
+  const body        = document.body;
+  const minutesEl   = document.getElementById("minutes");
+  const secondsEl   = document.getElementById("seconds");
+  const timerText   = document.getElementById("timerText");
+  const statusText  = document.getElementById("statusText");
+  const alarmBadge  = document.getElementById("alarmBadge");
+  const ring        = document.getElementById("ringProgress");
+  const inputsBox   = document.getElementById("inputs");
+
+  const btnStart    = document.getElementById("btnStart");
+  const btnPause    = document.getElementById("btnPause");
+  const btnReset    = document.getElementById("btnReset");
+  const btnStopAlarm= document.getElementById("btnStopAlarm");
+
+  // ===== ثوابت الدائرة =====
+  const R = 90;
+  const CIRC = 2 * Math.PI * R;
+  ring.style.strokeDasharray = CIRC.toFixed(2);
+  ring.style.strokeDashoffset = "0";
+
+  // ===== حالة المؤقت =====
+  const STATE = { IDLE: "idle", RUNNING: "running", PAUSED: "paused", ALARM: "alarm" };
+  let state = STATE.IDLE;
+
+  let totalMs = 0;        // المدة الكاملة
+  let remainingMs = 0;    // المتبقي
+  let endTimestamp = 0;   // وقت الانتهاء المطلق (performance.now)
+  let tickHandle = null;  // requestAnimationFrame
+  let lastRenderSec = -1; // لتقليل تحديثات النص
+
+  // ===== تنبيه =====
+  const ALARM_DURATION = 10000; // 10 ثوانٍ
+  let alarmTimeout = null;
+  let audioCtx = null;
+  let alarmNodes = null;       // { osc, osc2, gain, lfo }
+  let alarmStartTime = 0;
+
+  // ===== أدوات مساعدة =====
+  function pad2(n) { return String(n).padStart(2, "0"); }
+
+  function formatTime(ms) {
+    const totalSec = Math.max(0, Math.ceil(ms / 1000));
+    const m = Math.floor(totalSec / 60);
+    const s = totalSec % 60;
+    return pad2(m) + ":" + pad2(s);
+  }
+
+  function clampInt(value, min, max) {
+    const n = parseInt(value, 10);
+    if (isNaN(n)) return NaN;
+    return Math.min(max, Math.max(min, n));
+  }
+
+  function readDurationFromInputs() {
+    let m = clampInt(minutesEl.value, 0, 999);
+    let s = clampInt(secondsEl.value, 0, 59);
+    if (isNaN(m)) m = 0;
+    if (isNaN(s)) s = 0;
+    return { m, s, totalMs: (m * 60 + s) * 1000 };
+  }
+
+  function setStatus(text) {
+    statusText.textContent = text;
+  }
+
+  function updateRing(fraction) {
+    // fraction: 1 = ممتلئ، 0 = فارغ
+    const clamped = Math.min(1, Math.max(0, fraction));
+    ring.style.strokeDashoffset = (CIRC * (1 - clamped)).toFixed(2);
+    ring.classList.toggle("warn", clamped <= 0.5 && clamped > 0.2);
+    ring.classList.toggle("danger", clamped <= 0.2 && clamped > 0);
+  }
+
+  function resetRingColor() {
+    ring.classList.remove("warn", "danger");
+  }
+
+  function validateInputsShowError(show) {
+    const m = clampInt(minutesEl.value, 0, 999);
+    const s = clampInt(secondsEl.value, 0, 59);
+    const badM = isNaN(m) || String(m) !== minutesEl.value.trim();
+    const badS = isNaN(s) || String(s) !== secondsEl.value.trim();
+    minutesEl.classList.toggle("error", show && badM);
+    secondsEl.classList.toggle("error", show && badS);
+    return !badM && !badS;
+  }
+
+  // ===== تحديث واجهة الأزرار =====
+  function refreshButtons() {
+    const running  = state === STATE.RUNNING;
+    const paused   = state === STATE.PAUSED;
+    const idle     = state === STATE.IDLE;
+    const alarm    = state === STATE.ALARM;
+
+    btnStart.disabled = running || paused || alarm;
+    btnPause.disabled = !running;
+    btnPause.textContent = paused ? "استئناف" : "إيقاف مؤقت";
+    btnPause.disabled = !(running || paused);
+    btnReset.disabled = alarm;
+    inputsBox.style.pointerEvents = idle ? "auto" : "none";
+    minutesEl.disabled = !idle;
+    secondsEl.disabled = !idle;
+  }
+
+  // ===== رسم الإطار =====
+  function render(now) {
+    if (state === STATE.RUNNING) {
+      remainingMs = Math.max(0, endTimestamp - now);
+      if (remainingMs <= 0) {
+        remainingMs = 0;
+        renderDisplay();
+        finishCountdown();
+        return;
+      }
+      renderDisplay();
+    }
+    tickHandle = requestAnimationFrame(render);
+  }
+
+  function renderDisplay() {
+    const sec = Math.ceil(remainingMs / 1000);
+    if (sec !== lastRenderSec) {
+      lastRenderSec = sec;
+      timerText.textContent = formatTime(remainingMs);
+    }
+    const fraction = totalMs > 0 ? remainingMs / totalMs : 0;
+    updateRing(fraction);
+  }
+
+  // ===== بدء / إيقاف / استئناف =====
+  function start() {
+    if (state === STATE.RUNNING || state === STATE.PAUSED || state === STATE.ALARM) return;
+
+    const { totalMs: dur } = readDurationFromInputs();
+
+    if (!validateInputsShowError(true)) {
+      setStatus("أدخل أرقامًا صحيحة");
+      return;
+    }
+    if (dur <= 0) {
+      setStatus("المدة يجب أن تكون أكبر من صفر");
+      minutesEl.classList.add("error");
+      secondsEl.classList.add("error");
+      setTimeout(() => {
+        minutesEl.classList.remove("error");
+        secondsEl.classList.remove("error");
+      }, 1200);
+      return;
+    }
+
+    // توحيد القيم المعروضة
+    const { m, s } = readDurationFromInputs();
+    minutesEl.value = m;
+    secondsEl.value = s;
+
+    // تحضير الصوت بعد تفاعل المستخدم (مسموح هنا)
+    ensureAudio();
+
+    totalMs = dur;
+    remainingMs = dur;
+    lastRenderSec = -1;
+    resetRingColor();
+    renderDisplay();
+
+    endTimestamp = performance.now() + remainingMs;
+    state = STATE.RUNNING;
+    setStatus("جارٍ العد التنازلي…");
+    refreshButtons();
+
+    cancelAnimationFrame(tickHandle);
+    tickHandle = requestAnimationFrame(render);
+  }
+
+  function pause() {
+    if (state === STATE.RUNNING) {
+      remainingMs = Math.max(0, endTimestamp - performance.now());
+      state = STATE.PAUSED;
+      cancelAnimationFrame(tickHandle);
+      setStatus("متوقف مؤقتًا");
+      refreshButtons();
+    } else if (state === STATE.PAUSED) {
+      endTimestamp = performance.now() + remainingMs;
+      state = STATE.RUNNING;
+      setStatus("جارٍ العد التنازلي…");
+      refreshButtons();
+      cancelAnimationFrame(tickHandle);
+      tickHandle = requestAnimationFrame(render);
+    }
+  }
+
+  function reset() {
+    if (state === STATE.ALARM) return;
+    cancelAnimationFrame(tickHandle);
+    state = STATE.IDLE;
+    totalMs = 0;
+    remainingMs = 0;
+    lastRenderSec = -1;
+    updateRing(0);
+    ring.style.strokeDashoffset = "0";
+    resetRingColor();
+
+    // أعد قيم الإدخال للحالة الافتراضية عند الإعادة
+    const { m, s } = readDurationFromInputs();
+    timerText.textContent = pad2(m) + ":" + pad2(s);
+    setStatus("أدخل الوقت ثم اضغط «ابدأ»");
+    minutesEl.classList.remove("error");
+    secondsEl.classList.remove("error");
+    refreshButtons();
+  }
+
+  // ===== انتهاء الوقت =====
+  function finishCountdown() {
+    cancelAnimationFrame(tickHandle);
+    remainingMs = 0;
+    lastRenderSec = 0;
+    timerText.textContent = "00:00";
+    updateRing(0);
+    enterAlarm();
+  }
+
+  function enterAlarm() {
+    state = STATE.ALARM;
+    setStatus("");
+    alarmBadge.style.display = "inline-block";
+    body.classList.add("alarm");
+    refreshButtons();
+
+    startAlarmSound();
+    alarmStartTime = performance.now();
+
+    clearTimeout(alarmTimeout);
+    alarmTimeout = setTimeout(stopAlarm, ALARM_DURATION);
+  }
+
+  function stopAlarm() {
+    if (state !== STATE.ALARM) return;
+    clearTimeout(alarmTimeout);
+    alarmTimeout = null;
+    body.classList.remove("alarm");
+    alarmBadge.style.display = "none";
+    stopAlarmSound();
+
+    state = STATE.IDLE;
+    totalMs = 0;
+    remainingMs = 0;
+    lastRenderSec = -1;
+
+    // إعادة عرض القيم المدخلة الحالية
+    const { m, s } = readDurationFromInputs();
+    timerText.textContent = pad2(m) + ":" + pad2(s);
+    setStatus("أدخل الوقت ثم اضغط «ابدأ»");
+    updateRing(0);
+    ring.style.strokeDashoffset = "0";
+    resetRingColor();
+    refreshButtons();
+  }
+
+  // ===== الصوت (Web Audio API) =====
+  function ensureAudio() {
+    if (!audioCtx) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      audioCtx = new AC();
+    }
+    if (audioCtx.state === "suspended") {
+      audioCtx.resume().catch(() => {});
+    }
+  }
+
+  function startAlarmSound() {
+    ensureAudio();
+    if (!audioCtx) return;
+    if (alarmNodes) return; // يعمل بالفعل
+
+    const now = audioCtx.currentTime;
+
+    const master = audioCtx.createGain();
+    master.gain.setValueAtTime(0.0001, now);
+    master.gain.exponentialRampToValueAtTime(0.22, now + 0.05);
+    master.connect(audioCtx.destination);
+
+    // نغمة أساسية
+    const osc1 = audioCtx.createOscillator();
+    osc1.type = "square";
+    osc1.frequency.setValueAtTime(880, now);
+
+    // نغمة ثانية (هارموني)
+    const osc2 = audioCtx.createOscillator();
+    osc2.type = "sine";
+    osc2.frequency.setValueAtTime(1320, now);
+    const osc2Gain = audioCtx.createGain();
+    osc2Gain.gain.value = 0.35;
+
+    // LFO لتعديل التردد (رنين متذبذب)
+    const lfo = audioCtx.createOscillator();
+    lfo.type = "sine";
+    lfo.frequency.value = 6;
+    const lfoGain = audioCtx.createGain();
+    lfoGain.gain.value = 220;
+    lfo.connect(lfoGain);
+    lfoGain.connect(osc1.frequency);
+
+    // مفتاح دقات (قطع/وصل) ليعطي إحساس الرنين
+    const gate = audioCtx.createGain();
+    gate.gain.value = 0.7;
+
+    osc1.connect(gate);
+    osc2.connect(osc2Gain);
+    osc2Gain.connect(gate);
+    gate.connect(master);
+
+    osc1.start(now);
+    osc2.start(now);
+    lfo.start(now);
+
+    alarmNodes = { osc1, osc2, lfo, master, gate };
+  }
+
+  function stopAlarmSound() {
+    if (!alarmNodes || !audioCtx) return;
+    const now = audioCtx.currentTime;
+    try {
+      alarmNodes.master.gain.cancelScheduledValues(now);
+      alarmNodes.master.gain.setValueAtTime(alarmNodes.master.gain.value, now);
+      alarmNodes.master.gain.exponentialRampToValueAtTime(0.0001, now + 0.08);
+    } catch (e) { /* تجاهل */ }
+
+    const nodes = alarmNodes;
+    alarmNodes = null;
+
+    setTimeout(() => {
+      try {
+        nodes.osc1.stop();
+        nodes.osc2.stop();
+        nodes.lfo.stop();
+        nodes.osc1.disconnect();
+        nodes.osc2.disconnect();
+        nodes.lfo.disconnect();
+        nodes.master.disconnect();
+      } catch (e) { /* تجاهل */ }
+    }, 120);
+  }
+
+  // ===== ربط الأحداث =====
+  btnStart.addEventListener("click", start);
+  btnPause.addEventListener("click", pause);
+  btnReset.addEventListener("click", reset);
+  btnStopAlarm.addEventListener("click", stopAlarm);
+
+  // إدخال: Enter يبدأ، وتنقية الحقول
+  [minutesEl, secondsEl].forEach((el) => {
+    el.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        start();
+      }
+    });
+    el.addEventListener("input", () => {
+      el.classList.remove("error");
+      // عرض مباشر للقيمة في المؤقت أثناء الخمول
+      if (state === STATE.IDLE) {
+        const { m, s } = readDurationFromInputs();
+        timerText.textContent = pad2(isNaN(m) ? 0 : m) + ":" + pad2(isNaN(s) ? 0 : s);
+      }
+    });
+    el.addEventListener("blur", () => {
+      const max = el === minutesEl ? 999 : 59;
+      let v = parseInt(el.value, 10);
+      if (isNaN(v) || v < 0) v = 0;
+      if (v > max) v = max;
+      el.value = v;
+      if (state === STATE.IDLE) {
+        const { m, s } = readDurationFromInputs();
+        timerText.textContent = pad2(m) + ":" + pad2(s);
+        setStatus("أدخل الوقت ثم اضغط «ابدأ»");
+      }
+    });
+  });
+
+  // مفتاح المسافة: إيقاف/استئناف، R: إعادة ضبط، Esc: إيقاف التنبيه
+  document.addEventListener("keydown", (e) => {
+    if (e.target && (e.target.tagName === "INPUT")) return;
+
+    if (e.code === "Space") {
+      e.preventDefault();
+      if (state === STATE.RUNNING || state === STATE.PAUSED) pause();
+      else if (state === STATE.IDLE) start();
+    } else if (e.key === "r" || e.key === "R") {
+      reset();
+    } else if (e.key === "Escape") {
+      if (state === STATE.ALARM) stopAlarm();
+    }
+  });
+
+  // إخفاء التمرير عند السحب على الهاتف
+  document.addEventListener("touchmove", (e) => {
+    if (state !== STATE.IDLE) e.preventDefault();
+  }, { passive: false });
+
+  // ===== التهيئة =====
+  updateRing(0);
+  ring.style.strokeDashoffset = "0";
+  timerText.textContent = pad2(readDurationFromInputs().m) + ":" + pad2(readDurationFromInputs().s);
+  refreshButtons();
+
+  // استئناف AudioContext عند أول تفاعل إضافي (احتياطي)
+  ["pointerdown", "touchstart", "keydown"].forEach((ev) => {
+    document.addEventListener(ev, () => ensureAudio(), { once: true, passive: true });
+  });
+})();
+</script>
+</body>
+</html>
